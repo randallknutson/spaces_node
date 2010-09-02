@@ -1,0 +1,130 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Turn a node into a space.
+ *
+ * This module allows a content type to become a space.  This makes it possible
+ * to use spaces to save settings on a per node basis.  This is useful for
+ * designkit, context_layout and context so that the layout, content and
+ * theming for a specific node can be changed.
+ */
+
+/**
+ * Implementation of hook_init().
+ */
+function spaces_node_init() {
+  if (arg(0) === 'node' && is_numeric(arg(1)) && arg(2) == '') {
+    $node = menu_get_object();
+    if (variable_get('spaces_node_' . $node->type, 0)) {
+      spaces_init_space('node', $node->nid);
+      $space = spaces_get_space();
+      $dashboard = $node->type;
+      if (isset($dashboard)) {
+        $context = context_load("spaces_dashboard-{$dashboard}");
+        if (!$context) {
+          $context = ctools_export_new_object('context');
+          $context->name = "spaces_dashboard-{$dashboard}";
+          $context->description = 'Dashboard';
+          $context->tag = 'Dashboard';
+          context_save($context);
+        }
+        context_set('spaces', 'dashboard', "spaces_dashboard-{$dashboard}");
+        context_set('context', "spaces_dashboard-{$dashboard}", $context);
+        context_set('context', "spaces_dashboard", TRUE);
+      }
+    }
+  }
+}
+
+/**
+ * Implementation of hook_ctools_plugin_api().
+ */
+function spaces_node_ctools_plugin_api($module, $api) {
+  if ($module == 'spaces' && $api == 'plugins') {
+    return array('version' => 3);
+  }
+}
+
+/**
+ * Implementation of hook_spaces_plugins().
+ */
+function spaces_node_spaces_plugins() {
+  $plugins = array();
+  $plugins['space_node'] = array(
+    'handler' => array(
+      'path' => drupal_get_path('module', 'spaces_node') .'/plugins',
+      'file' => 'space_node.inc',
+      'class' => 'space_node',
+      'parent' => 'space_type',
+    ),
+  );
+  return $plugins;
+}
+
+/**
+ * Implementation of hook_spaces_registry().
+ */
+function spaces_node_spaces_registry() {
+  return array(
+    'types' => array(
+      'node' => array(
+        'title' => t('Node space'),
+        'plugin' => 'space_node',
+        'path' => 'node/%',
+      ),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_form_alter().
+ */
+function spaces_node_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id == 'node_type_form' && isset($form['identity']['type'])) {
+    $form['spaces_node'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Spaces settings'),
+      '#collapsible' => TRUE,
+      '#collapsed' => TRUE,
+    );
+    $form['spaces_node']['spaces_node'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable spaces for this content type'),
+      '#default_value' => variable_get('spaces_node_'. $form['#node_type']->type, 0),
+    );
+  }
+}
+
+/**
+ * Implementation of hook_node_type().
+ */
+function spaces_node_node_type($op, $info) {
+  $settings = array(
+    'spaces_node',
+  );
+  switch ($op) {
+    case 'delete':
+      foreach ($settings as $setting) {
+        variable_del($setting .'_'. $info->type);
+      }
+      break;
+  }
+}
+
+/**
+ * Implementation of hook_context_links_alter().
+ */
+function spaces_node_context_links_alter(&$links) {
+  if (context_get('spaces', 'dashboard') && spaces_dashboard_access('admin')) {
+    $links['spaces-dashboard'] = array(
+      'title' => t('Customize page'),
+      'href' => $_GET['q'],
+      'fragment' => 'block-spaces_dashboard-editor',
+      'attributes' => array(
+        'class' => 'palette-toggle',
+      ),
+    );
+  }
+}

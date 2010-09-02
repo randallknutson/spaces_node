@@ -1,0 +1,12 @@
+; $Id$
+name = "Spaces Node"
+description = "Provides integration between Spaces and Nodes."
+package = "Spaces"
+core = "6.x"
+dependencies[] = spaces
+dependencies[] = spaces_dashboard
+dependencies[] = context
+dependencies[] = context_ui
+dependencies[] = context_layouts
+
+
